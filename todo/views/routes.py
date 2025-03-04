@@ -1,4 +1,8 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
+from todo.models import db
+from todo.models.todo import Todo
+from datetime import datetime
+
  
 api = Blueprint('api', __name__, url_prefix='/api/v1') 
 
@@ -20,23 +24,55 @@ def health():
 
 @api.route('/todos', methods=['GET'])
 def get_todos():
-    """Return the list of todo items"""
-    return jsonify([TEST_ITEM])
+    todos = Todo.query.all()  # 从数据库中获取所有 Todo 记录
+    result = []  # 创建一个空列表，用于存储每个 Todo 对象的字典格式
+
+    for todo in todos:
+        result.append(todo.to_dict())  # 将每个 Todo 对象转换为字典，并添加到 result 列表中
+    
+    return jsonify(result)  # 将 result 列表作为 JSON 响应返回
+
 
 @api.route('/todos/<int:todo_id>', methods=['GET'])
 def get_todo(todo_id):
-    """Return the details of a todo item"""
-    return jsonify(TEST_ITEM)
+    todo = Todo.query.get(todo_id)  # 根据传入的 todo_id 从数据库中获取指定的 Todo 记录
+    if todo is None:  # 如果没有找到对应的 Todo 记录
+        return jsonify({'error': 'Todo not found'}), 404
+    return jsonify(todo.to_dict())  
+
 
 @api.route('/todos', methods=['POST'])
 def create_todo():
-    """Create a new todo item and return the created item"""
-    return jsonify(TEST_ITEM), 201
+    todo = Todo(
+        title=request.json.get('title'),
+        description=request.json.get('description'),
+        completed=request.json.get('completed', False),
+    )
+    if 'deadline_at' in request.json:
+        todo.deadline_at = datetime.fromisoformat(request.json.get('deadline_at'))
+    
+    # 添加新记录到数据库或更新现有记录
+    db.session.add(todo)
+    # 提交数据库更改
+    db.session.commit()
+    
+    return jsonify(todo.to_dict()), 201
+
 
 @api.route('/todos/<int:todo_id>', methods=['PUT'])
 def update_todo(todo_id):
-    """Update a todo item and return the updated item"""
-    return jsonify(TEST_ITEM)
+    todo = Todo.query.get(todo_id)
+    if todo is None:
+        return jsonify({'error': 'Todo not found'}), 404
+    
+    todo.title = request.json.get('title', todo.title)
+    todo.description = request.json.get('description', todo.description)
+    todo.completed = request.json.get('completed', todo.completed)
+    todo.deadline_at = request.json.get('deadline_at', todo.deadline_at)
+    
+    db.session.commit()
+    return jsonify(todo.to_dict())
+
 
 @api.route('/todos/<int:todo_id>', methods=['DELETE'])
 def delete_todo(todo_id):
