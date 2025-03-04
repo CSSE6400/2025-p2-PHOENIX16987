@@ -76,6 +76,11 @@ def update_todo(todo_id):
 
 @api.route('/todos/<int:todo_id>', methods=['DELETE'])
 def delete_todo(todo_id):
-    """Delete a todo item and return the deleted item"""
-    return jsonify(TEST_ITEM)
+    todo = Todo.query.get(todo_id)
+    if todo is None:
+        return jsonify({}), 200
+    db.session.delete(todo)
+    db.session.commit()
+    return jsonify(todo.to_dict()), 200
+
  
